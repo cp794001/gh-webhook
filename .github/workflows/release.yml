@@ -1,3 +1,56 @@
+Here is a structured, actionable code review template and evaluation framework for these three files in a CI/CD infrastructure repository.
+Overview & Context
+This pull request / changesets covers the end-to-end lifecycle for Rust on Windows targeting GNU/LLVM ARM64:
+ * Installation Script (Install-Rust.ps1): Handles toolchain and target installation.
+ * Validation Test (Rust.Tests.ps1): Ensures the environment, compiler, and target cross-compilation function correctly.
+ * GitHub Actions Workflow (validate-rust-gnullvm-arm64.yml): Automates the build and test sequence in CI.
+Code Review Findings & Feedback
+1. Install-Rust.ps1 (Installation Script)
+Positive Aspects:
+ * Modularizing setup logic into separate installer scripts keeps workflow definitions clean.
+Areas for Improvement / Suggestions:
+ * Target Explicit Selection: Ensure rustup target add aarch64-pc-windows-gnullvm is explicitly invoked alongside the main toolchain installation.
+ * Idempotency & Caching: Check if Rust or rustup is already installed before downloading installer binaries to speed up runner setup time.
+ * Error Handling: Use $ErrorActionPreference = 'Stop' at the top of the PowerShell script to prevent silent failures during target or component installation.
+# Suggested Best Practice Snippet
+$ErrorActionPreference = 'Stop'
+
+if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
+    # Fetch rustup-init and install
+}
+
+rustup target add aarch64-pc-windows-gnullvm
+
+2. Rust.Tests.ps1 (Pester / Test Suite)
+Positive Aspects:
+ * Separating test assertions into dedicated script files keeps CI workflows dry and reproducible locally.
+Areas for Improvement / Suggestions:
+ * Target Architecture Verification: Ensure tests verify not just that rustc exists, but that it can successfully compile a hello-world binary for aarch64-pc-windows-gnullvm.
+ * Toolchain Verification: Validate that llvm-tools or necessary linker binaries (like lld) are available on the PATH, as gnullvm target triples rely on LLVM linkers.
+# Example Pester Test Assertion
+Describe "Rust gnullvm ARM64 Toolchain" {
+    It "Compiles a minimal binary for target aarch64-pc-windows-gnullvm" {
+        $testCode = 'fn main() { println!("Hello ARM64"); }'
+        # Compile and check exit code
+    }
+}
+
+3. .github/workflows/validate-rust-gnullvm-arm64.yml (CI Workflow)
+Positive Aspects:
+ * Having a dedicated validation workflow isolates target-specific regression testing.
+Areas for Improvement / Suggestions:
+ * Runner OS Selection: Ensure the step runs on a Windows runner (runs-on: windows-latest or specific image) since the setup script uses PowerShell (.ps1).
+ * Toolchain Caching: Implement actions/cache or dtolnay/rust-toolchain caching steps if execution time becomes a bottleneck.
+ * Step Ordering:
+   * Check out repository (actions/checkout).
+   * Execute Install-Rust.ps1.
+   * Execute Rust.Tests.ps1.
+Summary Verdict
+| File | Status | Key Action Item |
+|---|---|---|
+| Install-Rust.ps1 | Approved with suggestions | Ensure $ErrorActionPreference = 'Stop' and target triplet aarch64-pc-windows-gnullvm registration. |
+| Rust.Tests.ps1 | Approved with suggestions | Confirm compilation smoke test tests binary emission for aarch64-pc-windows-gnullvm. |
+| .github/workflows/validate-rust-gnullvm-arm64.yml | Approved | Confirm correct OS matrix (windows-latest) and path resolutions. |
 name: release
 on:
   push:
